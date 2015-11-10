@@ -22,7 +22,6 @@
 #include <liblightnvm.h>
 
 #include "dflash.h"
-#include "ioctl.h"
 
 static struct dflash_guid guid = {
 	.guid = 0,

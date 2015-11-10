@@ -26,7 +26,8 @@
 #include <pthread.h>
 #include <time.h>
 
-#include "util/uthash.h"
+#include "provisioning.h"
+#include "../util/uthash.h"
 #include "../util/debug.h"
 
 /*
@@ -39,16 +40,6 @@
 struct dflash_guid {
 	uint64_t guid;
 	pthread_spinlock_t lock;
-};
-
-struct vblock {
-	uint64_t id;
-	uint64_t bppa;
-	uint32_t vlun_id;
-	uint32_t owner_id;
-	uint32_t nppas;
-	uint16_t ppa_bitmap;
-	uint16_t flags;
 };
 
 /* TODO: Allocate dynamic number of blocks */

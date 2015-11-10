@@ -18,12 +18,12 @@ all_targets += liblightnvm.a $(libname)
 all: $(all_targets)
 
 # liblightnvm provided functions
-liblightnvm_srcs := mgmt.c
+liblightnvm_srcs := mgmt.c provisioning.c dflash.c
 
 liblightnvm_objs := $(patsubst %.c,%.ol,$(liblightnvm_srcs))
 liblightnvm_sobjs := $(patsubst %.c,%.os,$(liblightnvm_srcs))
 
-$(liblightnvm_objs) $(liblightnvm_sobjs): liblightnvm.h ioctl.h
+$(liblightnvm_objs) $(liblightnvm_sobjs): liblightnvm.h
 
 %.os: %.c
 	$(CC) $(SO_CFLAGS) -c -o $@ $<
