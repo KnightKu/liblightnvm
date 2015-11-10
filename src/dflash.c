@@ -30,7 +30,12 @@ static struct dflash_guid guid = {
 static struct dflash_file *dfiles = NULL;
 
 /* TODO: Map lnvm targets */
-int nvm_create(int tgt, int flags)
+/*
+ * This function allows an application to choose the LightNVM target from which
+ * the new dflash file will obtain flash blocks. If this function is not called
+ * before opening a dflash file, a default LightNVM target will be used
+ */
+uint64_t nvm_create(int tgt, uint32_t stream_id, int flags)
 {
 	struct dflash_file *f;
 
@@ -38,6 +43,7 @@ int nvm_create(int tgt, int flags)
 	if (!f)
 		return -ENOMEM;
 
+	f->stream_id = stream_id;
 	atomic_assign_id(&guid, &f->gid);
 	HASH_ADD_INT(dfiles, gid, f);
 	LNVM_DEBUG("Created dflash file. Target: %d\n", tgt);
@@ -54,16 +60,29 @@ void nvm_delete(int fd, int flags)
 	free(f);
 }
 
-// Is this necessary??
-int nvm_open(int fd, int flags)
+/* TODO: Assign different file descriptors to same dflash file. For now access
+ * dflash files by file id */
+int nvm_open(uint64_t dflash_id, int flags)
 {
 	struct dflash_file *f;
+	size_t w_buf_size;
 
-	HASH_FIND_INT(dfiles, &fd, f);
+	HASH_FIND_INT(dfiles, &dflash_id, f);
 	if (!f) {
 		LNVM_DEBUG("File descriptor %d does not exist\n", fd);
 		return -EINVAL;
 	}
+
+	/* Write buffer for small writes */
+	w_buf_size = calculate_wbuf_size(f);
+	f->w_buffer->buf = memalign(PAGE_SIZE, w_buf_size);
+	if (!f->w_buffer)
+		return -ENOMEM;
+
+	f->w_buffer->cursize = 0;
+	f->w_buffer->curflush =0;
+	f->w_buffer->mem = f->w_buffer->buf;
+	f->w_buffer->flush = f->w_buffer->buf;
 
 	return 0;
 }

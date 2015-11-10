@@ -82,4 +82,8 @@ out:
 	return ret;
 }
 
+size_t calculate_wbuf_size(struct dflash_file *f)
+{
+
+}
 

@@ -36,18 +36,33 @@
  */
 
 #define MAX_BLOCKS 5
+#define PAGE_SIZE 4096
 
 struct dflash_guid {
 	uint64_t guid;
 	pthread_spinlock_t lock;
 };
 
+struct w_buffer {
+	size_t cursize;		/* Current buf lenght. Follows mem */
+	size_t curflush;	/* Bytes in buf that have been flushed */
+	size_t buf_limit;	/* Limit for the allocated memory region */
+	char *buf;		/* Buffer to cache writes */
+	char *mem;		/* Points to the place in buf where writes can be
+				 * appended to. It defines the part of the
+				 * buffer containing valid data */
+	char *flush;		/* Points to the place in buf until which data
+				 * has been flushed to the media */
+};
+
 /* TODO: Allocate dynamic number of blocks */
 /* TODO: Store the lnvm target the file belongs to */
 struct dflash_file {
 	uint64_t gid;				/* internal global identifier */
+	uint32_t stream_id			/* stream associated with file */
 	struct vblock vblocks[MAX_BLOCKS];	/* vblocks forming the file */
 	uint8_t nvblocks;			/* number of vblocks */
+	struct w_buffer w_buffer;		/* write buffer */
 	unsigned long bytes;			/* valid bytes */
 	struct timespec atime;			/* last access time */
 	struct timespec mtime;			/* last modify time */

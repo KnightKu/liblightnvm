@@ -34,11 +34,15 @@ struct vblock {
 	uint16_t flags;
 };
 
+/* provisioning */
 int get_block(int tgt, uint32_t vlun_id, struct vblock *vblock);
 // int get_block(int tgt, uint32_t vlun_id, void *meta, uint16_t meta_size,
 							// struct vblock *vblock);
 int get_block_meta(int tgt, uint64_t vblock_id, struct vblock *vblock);
 int put_block(int tgt, struct vblock *vblock);
+
+/* helper functions */
+size_t calculate_wbuf_size(struct dflash_file);
 
 #endif
 

@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
 #include <sys/types.h>
 #include <linux/lightnvm.h>
 
@@ -35,10 +36,14 @@ int nvm_get_devices(struct nvm_ioctl_get_devices *);
 int nvm_create_target(struct nvm_ioctl_create *);
 int nvm_remove_target(struct nvm_ioctl_remove *);
 
+/* core */
+int nvm_get_nstreams();
+int nvm_get_lun_prop(uint32_t stream_id);
+
 /* dflash.c */
-int nvm_create(int tgt, int flags);
+uint64_t nvm_create(int tgt, uint32_t stream_id, int flags);
 void nvm_delete(int fd, int flags);
-int nvm_open(int fd, int flags);
+int nvm_open(uint64_t dflash_id int flags);
 void nvm_close(int fd, int flags);
 int nvm_append(int fd, const void *buf, size_t count);
 int nvm_read(int fd, void *buf, size_t count, off_t offset, int flags);
