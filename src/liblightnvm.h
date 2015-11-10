@@ -20,7 +20,6 @@
  *
  * liblightnvm Linux Open-Channel I/O interface
  */
-
 #ifndef __LIBLIGHTNVM_H
 #define __LIBLIGHTNVM_H
 
