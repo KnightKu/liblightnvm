@@ -27,14 +27,24 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
-
-#include "ioctl.h"
+#include <linux/lightnvm.h>
 
 /* mgmt.c */
 int nvm_get_info(struct nvm_ioctl_info *);
 int nvm_get_devices(struct nvm_ioctl_get_devices *);
 int nvm_create_target(struct nvm_ioctl_create *);
 int nvm_remove_target(struct nvm_ioctl_remove *);
+
+/* dflash.c */
+int nvm_create(int tgt, int flags);
+void nvm_delete(int fd, int flags);
+int nvm_open(int fd, int flags);
+void nvm_close(int fd, int flags);
+int nvm_append(int fd, const void *buf, size_t count);
+int nvm_read(int fd, void *buf, size_t count, off_t offset, int flags);
+
+/* unittests */
+int nvm_test_lib();
 
 #ifdef __cplusplus
 }
