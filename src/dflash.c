@@ -39,6 +39,72 @@ static struct atomic_guid fd_guid = {
 static struct dflash_file *dfilet = NULL;
 static struct dflash_fdentry *fdt = NULL;
 
+static void init_file(struct dflash_file *f, uint32_t stream_id, int fd)
+{
+	atomic_assign_inc_id(&dflash_guid, &f->gid);
+	f->tgt = fd;
+	f->stream_id = stream_id;
+	f->nvblocks = 0;
+	f->bytes = 0;
+
+	/* TODO: Access times */
+}
+
+/* XXX: All block functions assume that block allocation is thread safe */
+/* TODO: Allocate blocks dynamically */
+
+static void switch_block(struct dflash_file *f)
+{
+	f->w_buffer.cursize = 0;
+	f->w_buffer.curflush =0;
+	f->w_buffer.mem = f->w_buffer.buf;
+	f->w_buffer.flush = f->w_buffer.buf;
+
+	f->current_vblock = &f->vblocks[f->nvblocks];
+
+	LNVM_DEBUG("Block switched. File: %lu, id: %lu\n",
+			f->gid,
+			f->current_vblock->id);
+}
+
+static int preallocate_block(struct dflash_file *f)
+{
+	struct vblock *vblock = &f->vblocks[f->nvblocks];
+	int ret = 0;
+
+	ret = get_block(f->tgt, f->stream_id, vblock);
+	if (ret) {
+		LNVM_DEBUG("Could not allocate a new block for file %lu\n",
+				f->gid);
+		goto out;
+	}
+
+	f->nvblocks++;
+
+	LNVM_DEBUG("Block preallocated. File: %lu, id: %lu, bppa: %lu\n",
+			f->gid,
+			f->vblocks[f->nvblocks].id,
+			f->vblocks[f->nvblocks].bppa);
+
+out:
+	return ret;
+}
+
+static int allocate_block(struct dflash_file *f)
+{
+	int ret;
+
+	ret = preallocate_block(f);
+	switch_block(f);
+	return ret;
+}
+
+static int file_sync(struct dflash_file *f, uint8_t flags)
+{
+
+	return 0;
+}
+
 /* TODO: Map lnvm targets */
 /*
  * This function allows an application to choose the LightNVM target from which
@@ -63,9 +129,7 @@ uint64_t nvm_create(const char *tgt, uint32_t stream_id, int flags)
 		return fd;
 	}
 
-	f->stream_id = stream_id;
-	f->tgt = fd;
-	atomic_assign_inc_id(&dflash_guid, &f->gid);
+	init_file(f, stream_id, fd);
 	HASH_ADD_INT(dfilet, gid, f);
 	LNVM_DEBUG("Created dflash file. Target: %s\n", tgt);
 
@@ -107,10 +171,10 @@ int nvm_open(uint64_t file_id, int flags)
 		return ret;
 	}
 
-	f->w_buffer.cursize = 0;
-	f->w_buffer.curflush =0;
-	f->w_buffer.mem = f->w_buffer.buf;
-	f->w_buffer.flush = f->w_buffer.buf;
+	/* Allocate flash block */
+	ret = allocate_block(f);
+	if (ret)
+		goto error;
 
 	fd_entry = malloc(sizeof(struct dflash_fdentry));
 	if (!fd_entry) {
@@ -122,7 +186,7 @@ int nvm_open(uint64_t file_id, int flags)
 	fd_entry->dfile = f;
 	HASH_ADD_INT(fdt, fd, fd_entry);
 
-	LNVM_DEBUG("Opened fd %d for file %lu\n", fd_entry->fd, file_id);
+	LNVM_DEBUG("Opened fd %lu for file %lu\n", fd_entry->fd, file_id);
 	return fd_entry->fd;
 
 error:
@@ -136,7 +200,7 @@ void nvm_close(int fd, int flags)
 
 	HASH_FIND_INT(fdt, &fd, fd_entry);
 	HASH_DEL(fdt, fd_entry);
-	LNVM_DEBUG("Closed fd %d for file %lu\n",
+	LNVM_DEBUG("Closed fd %lu for file %lu\n",
 			fd_entry->fd, fd_entry->dfile->gid);
 	/* FIXME: For now, free write buffer here. In the future we might want
 	 * to maintain this buffer as a page cache for reads
@@ -145,10 +209,19 @@ void nvm_close(int fd, int flags)
 	free(fd_entry);
 }
 
-int nvm_append(int fd, const void *buf, size_t count)
+/* TODO: Implement a pool of available bloks to support double buffering */
+/*
+ * TODO: Flush pages in a different threa as write buffer gets filled up,
+ * instead of flushing the whole block at a time
+ */
+size_t nvm_append(int fd, const void *buf, size_t count)
 {
 	struct dflash_fdentry *fd_entry;
 	struct dflash_file *f;
+	size_t offset = 0;
+	size_t left;
+	char *mem;
+	int ret;
 
 	HASH_FIND_INT(fdt, &fd, fd_entry);
 	if (!fd_entry) {
@@ -156,13 +229,34 @@ int nvm_append(int fd, const void *buf, size_t count)
 		return -EINVAL;
 	}
 	f = fd_entry->dfile;
+	mem = f->w_buffer.mem;
 
 	LNVM_DEBUG("Append to file %lu (fd: %d)\n", f->gid, fd);
-	
+
+	if (f->w_buffer.cursize + count > f->w_buffer.buf_limit) {
+		size_t fits_buf = f->w_buffer.buf_limit - f->w_buffer.cursize;
+		ret = preallocate_block(f);
+		if (ret)
+			return ret;
+		memcpy(mem, buf, fits_buf);
+		mem += fits_buf;
+		f->w_buffer.cursize += fits_buf;
+		if (!file_sync(f, FORCE_FLUSH)) {
+			LNVM_DEBUG("Cannot force flush for file %lu\n", f->gid);
+			return -ENOSPC;
+		}
+		switch_block(f);
+		offset = fits_buf;
+	}
+	left = count - offset;
+	memcpy(mem, buf + offset, left);
+	mem += left;
+	f->w_buffer.cursize += left;
+
 	return 0;
 }
 
-int nvm_read(int fd, void *buf, size_t count, off_t offset, int flags)
+size_t nvm_read(int fd, void *buf, size_t count, off_t offset, int flags)
 {
 	return 0;
 }

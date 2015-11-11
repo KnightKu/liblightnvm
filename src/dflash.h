@@ -40,6 +40,9 @@
 #define MAX_BLOCKS 5
 #define PAGE_SIZE 4096
 
+#define FORCE_FLUSH 0
+#define OPTIONAL_FLUSH 1
+
 struct atomic_guid {
 	uint64_t guid;
 	pthread_spinlock_t lock;
@@ -58,11 +61,11 @@ struct w_buffer {
 };
 
 /* TODO: Allocate dynamic number of blocks */
-/* TODO: Store the lnvm target the file belongs to */
 struct dflash_file {
 	uint64_t gid;				/* internal global identifier */
 	uint32_t tgt;				/* fd of LightNVM target */
 	uint32_t stream_id;			/* stream associated with file */
+	struct vblock *current_vblock;		/* current block in use */
 	struct vblock vblocks[MAX_BLOCKS];	/* vblocks forming the file */
 	uint8_t nvblocks;			/* number of vblocks */
 	struct w_buffer w_buffer;		/* write buffer */

@@ -48,9 +48,9 @@ uint64_t nvm_create(const char *tgt, uint32_t stream_id, int flags);
 void nvm_delete(uint64_t file_id, int flags);
 int nvm_open(uint64_t file_id, int flags);
 void nvm_close(int fd, int flags);
-int nvm_append(int fd, const void *buf, size_t count);
+size_t nvm_append(int fd, const void *buf, size_t count);
 int nvm_sync(int fd);
-int nvm_read(int fd, void *buf, size_t count, off_t offset, int flags);
+size_t nvm_read(int fd, void *buf, size_t count, off_t offset, int flags);
 
 /* unittests */
 int nvm_test_lib();
