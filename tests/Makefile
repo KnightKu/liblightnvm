@@ -12,10 +12,10 @@ all: dflash_test lib_test
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 dflash_test: $(OBJ)
-	gcc -o $@ $^ $(CFLAGS) -llightnvm
+	gcc -o $@ $^ $(CFLAGS) -llightnvm -lpthread
 
 lib_test: $(LIBOBJ)
-	gcc -o $@ $^ $(CFLAGS) -llightnvm
+	gcc -o $@ $^ $(CFLAGS) -llightnvm -lpthread
 
 clean:
 	rm -f *.o dflash_test lib_test

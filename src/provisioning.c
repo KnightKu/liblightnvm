@@ -31,12 +31,12 @@ int get_block(int tgt, uint32_t vlun_id, struct vblock *vblock)
 	vblock->owner_id = 101;
 
 	ret = ioctl(tgt, NVM_PR_GET_BLOCK, vblock);
-	if (!ret) {
+	if (ret) {
 		LNVM_DEBUG("Could not get block from lun %d\n", vlun_id);
 		goto out;
 	}
 
-	LNVM_DEBUG("Get block from lun %d. Block id:%lu bppa:%llu\n",
+	LNVM_DEBUG("Get block from lun %d. Block id:%lu bppa:%lu\n",
 			vblock->vlun_id,
 			vblock->id,
 			vblock->bppa);
@@ -51,12 +51,12 @@ int get_block_meta(int tgt, uint64_t vblock_id, struct vblock *vblock)
 	vblock->id = vblock_id;
 
 	ret = ioctl(tgt, NVM_PR_GET_BLOCK_META, vblock);
-	if (!ret) {
+	if (ret) {
 		LNVM_DEBUG("Could not get metadata for block %lu\n", vblock_id);
 		goto out;
 	}
 
-	LNVM_DEBUG("Get block medatada for block %lu. Lun: %d, bppa:%llu\n",
+	LNVM_DEBUG("Get block medatada for block %lu. Lun: %d, bppa:%lu\n",
 			vblock->id,
 			vblock->vlun_id,
 			vblock->bppa);
@@ -69,7 +69,7 @@ int put_block(int tgt, struct vblock *vblock)
 	int ret = 0;
 
 	ret = ioctl(tgt, NVM_PR_PUT_BLOCK, vblock);
-	if (!ret) {
+	if (ret) {
 		LNVM_DEBUG("Could not put block %lu to lun %d\n",
 			vblock->id,
 			vblock->vlun_id);
@@ -81,8 +81,24 @@ out:
 	return ret;
 }
 
-size_t calculate_wbuf_size(struct dflash_file *f)
+/* TODO: Calculate it based on the stream the file is attached to. This should
+ * be done on init, when creating a target, and should live in memory */
+size_t get_npages_block(int tgt, uint32_t stream_id)
 {
+	int ret = 0;
+	uint32_t npages = stream_id; /* TODO: Share a structure */
 
+	ret = ioctl(tgt, NVM_DEV_NPAGES_BLOCK, &npages);
+	if (ret) {
+		LNVM_DEBUG("Could not get number of pages/block in stream %d\n",
+				stream_id);
+		goto out;
+	}
+
+	LNVM_DEBUG("Num. pages for blocks in stream %d: %d\n",
+			stream_id, npages);
+	ret = npages;
+out:
+	return ret;
 }
 

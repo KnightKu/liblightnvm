@@ -39,14 +39,17 @@ int nvm_remove_target(struct nvm_ioctl_remove *);
 
 /* core */
 int nvm_get_nstreams();
-int nvm_get_lun_prop(uint32_t stream_id);
+int nvm_get_stream_prop(uint32_t stream_id);
 
 /* dflash.c */
-uint64_t nvm_create(int tgt, uint32_t stream_id, int flags);
-void nvm_delete(int fd, int flags);
-int nvm_open(uint64_t dflash_id int flags);
+int nvm_init();
+void nvm_fini();
+uint64_t nvm_create(const char *tgt, uint32_t stream_id, int flags);
+void nvm_delete(uint64_t file_id, int flags);
+int nvm_open(uint64_t file_id, int flags);
 void nvm_close(int fd, int flags);
 int nvm_append(int fd, const void *buf, size_t count);
+int nvm_sync(int fd);
 int nvm_read(int fd, void *buf, size_t count, off_t offset, int flags);
 
 /* unittests */

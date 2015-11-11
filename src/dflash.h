@@ -35,10 +35,12 @@
  *	- Dynamic block list
  */
 
+#define NVM_TGT_NAME_MAX NVM_TTYPE_MAX + 5	/* 5 = strlen(/dev/) */
+
 #define MAX_BLOCKS 5
 #define PAGE_SIZE 4096
 
-struct dflash_guid {
+struct atomic_guid {
 	uint64_t guid;
 	pthread_spinlock_t lock;
 };
@@ -47,7 +49,7 @@ struct w_buffer {
 	size_t cursize;		/* Current buf lenght. Follows mem */
 	size_t curflush;	/* Bytes in buf that have been flushed */
 	size_t buf_limit;	/* Limit for the allocated memory region */
-	char *buf;		/* Buffer to cache writes */
+	void *buf;		/* Buffer to cache writes */
 	char *mem;		/* Points to the place in buf where writes can be
 				 * appended to. It defines the part of the
 				 * buffer containing valid data */
@@ -59,7 +61,8 @@ struct w_buffer {
 /* TODO: Store the lnvm target the file belongs to */
 struct dflash_file {
 	uint64_t gid;				/* internal global identifier */
-	uint32_t stream_id			/* stream associated with file */
+	uint32_t tgt;				/* fd of LightNVM target */
+	uint32_t stream_id;			/* stream associated with file */
 	struct vblock vblocks[MAX_BLOCKS];	/* vblocks forming the file */
 	uint8_t nvblocks;			/* number of vblocks */
 	struct w_buffer w_buffer;		/* write buffer */
@@ -70,7 +73,14 @@ struct dflash_file {
 	UT_hash_handle hh;			/* hash handle for uthash */
 };
 
-static inline void atomic_assign_id(struct dflash_guid *cnt, uint64_t *id)
+struct dflash_fdentry {
+	// uint32_t max_fds;		#<{(| Max number of fds |)}>#
+	uint64_t fd;			/* File descriptor */
+	struct dflash_file *dfile;	/* DFlash file associate with the fd */
+	UT_hash_handle hh;		/* hash handle for uthash */
+};
+
+static inline void atomic_assign_inc_id(struct atomic_guid *cnt, uint64_t *id)
 {
 	pthread_spin_lock(&cnt->lock);
 	cnt->guid++;

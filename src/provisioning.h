@@ -41,7 +41,7 @@ int get_block_meta(int tgt, uint64_t vblock_id, struct vblock *vblock);
 int put_block(int tgt, struct vblock *vblock);
 
 /* helper functions */
-size_t calculate_wbuf_size(struct dflash_file);
+size_t get_npages_block(int tgt, uint32_t stream_id);
 
 #endif
 

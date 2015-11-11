@@ -27,6 +27,13 @@
 #include "../src/ioctl.h"
 
 static CuSuite *per_test_suite = NULL;
+uint64_t file_id;
+
+static void init_lib(CuTest *ct)
+{
+	int ret = nvm_init();
+	CuAssertIntEquals(ct, 0, ret);
+}
 
 static void create_tgt(CuTest *ct)
 {
@@ -43,7 +50,7 @@ static void create_tgt(CuTest *ct)
 
 	ret = nvm_create_target(&c);
 
-	CuAssertIntEquals(ct, ret, 0);
+	CuAssertIntEquals(ct, 0, ret);
 }
 
 static void remove_tgt(CuTest *ct)
@@ -56,21 +63,37 @@ static void remove_tgt(CuTest *ct)
 
 	ret = nvm_remove_target(&c);
 
-	CuAssertIntEquals(ct, ret, 0);
+	CuAssertIntEquals(ct, 0, ret);
 }
 
 static void create_file(CuTest *ct)
 {
+	int fd;
+
 	create_tgt(ct);
+	file_id = nvm_create("test1", 0, 0);
+	CuAssertTrue(ct, file_id > 0);
+	fd = nvm_open(file_id, 0);
+	CuAssertTrue(ct, fd > 0);
+	nvm_close(fd, 0);
+	nvm_delete(file_id, 0);
 	remove_tgt(ct);
+}
+
+static void fini_lib(CuTest *ct)
+{
+	nvm_fini();
 }
 
 CuSuite *dflash_GetSuite()
 {
 	per_test_suite = CuSuiteNew();
 
+	SUITE_ADD_TEST(per_test_suite, init_lib);
 	SUITE_ADD_TEST(per_test_suite, create_tgt);
 	SUITE_ADD_TEST(per_test_suite, remove_tgt);
+	SUITE_ADD_TEST(per_test_suite, create_file);
+	SUITE_ADD_TEST(per_test_suite, fini_lib);
 }
 
 void run_all_test(void)

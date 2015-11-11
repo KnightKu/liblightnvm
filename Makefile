@@ -18,7 +18,7 @@ install_local:
 test:
 	@$(MAKE) -C tests
 	ln -sf tests/lib_test .
-	ln -sd tests/dflash_test .
+	ln -sf tests/dflash_test .
 
 clean:
 	@$(MAKE) -C src clean
