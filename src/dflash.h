@@ -40,8 +40,8 @@
 #define MAX_BLOCKS 5
 #define PAGE_SIZE 4096
 
-#define FORCE_FLUSH 0
-#define OPTIONAL_FLUSH 1
+#define FORCE_SYNC 0
+#define OPTIONAL_SYNC 1
 
 struct atomic_guid {
 	uint64_t guid;
@@ -50,14 +50,14 @@ struct atomic_guid {
 
 struct w_buffer {
 	size_t cursize;		/* Current buf lenght. Follows mem */
-	size_t curflush;	/* Bytes in buf that have been flushed */
+	size_t cursync;		/* Bytes in buf that have been synced to media */
 	size_t buf_limit;	/* Limit for the allocated memory region */
 	void *buf;		/* Buffer to cache writes */
 	char *mem;		/* Points to the place in buf where writes can be
 				 * appended to. It defines the part of the
 				 * buffer containing valid data */
-	char *flush;		/* Points to the place in buf until which data
-				 * has been flushed to the media */
+	char *sync;		/* Points to the place in buf until which data
+				 * has been synced to the media */
 };
 
 /* TODO: Allocate dynamic number of blocks */
@@ -89,6 +89,14 @@ static inline void atomic_assign_inc_id(struct atomic_guid *cnt, uint64_t *id)
 	cnt->guid++;
 	*id = cnt->guid;
 	pthread_spin_unlock(&cnt->lock);
+}
+
+static inline size_t calculate_ppa_off(size_t cursync)
+{
+	size_t disaligned_data = cursync % PAGE_SIZE;
+	size_t aligned_data = cursync / PAGE_SIZE;
+	uint8_t rest = (disaligned_data == 0) ? 0 : 1;
+	return (aligned_data + rest);
 }
 
 #endif

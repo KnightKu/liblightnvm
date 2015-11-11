@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <assert.h>
 #include <liblightnvm.h>
 
 #include "dflash.h"
@@ -56,9 +57,9 @@ static void init_file(struct dflash_file *f, uint32_t stream_id, int fd)
 static void switch_block(struct dflash_file *f)
 {
 	f->w_buffer.cursize = 0;
-	f->w_buffer.curflush =0;
+	f->w_buffer.cursync =0;
 	f->w_buffer.mem = f->w_buffer.buf;
-	f->w_buffer.flush = f->w_buffer.buf;
+	f->w_buffer.sync = f->w_buffer.buf;
 
 	f->current_vblock = &f->vblocks[f->nvblocks];
 
@@ -101,6 +102,40 @@ static int allocate_block(struct dflash_file *f)
 
 static int file_sync(struct dflash_file *f, uint8_t flags)
 {
+	size_t sync_len = f->w_buffer.cursize - f->w_buffer.cursync;
+	size_t ppa_off = calculate_ppa_off(f->w_buffer.cursync);
+	size_t disaligned_data = sync_len % PAGE_SIZE;
+	size_t synced_bytes;
+	uint16_t synced_pages;
+	uint16_t npages = sync_len / PAGE_SIZE;
+
+	if (((flags && OPTIONAL_SYNC) && (sync_len < PAGE_SIZE)) ||
+		(sync_len == 0))
+		return 0;
+
+	if (flags && FORCE_SYNC) {
+		if (f->w_buffer.cursync + sync_len == f->w_buffer.buf_limit) {
+			/* TODO: Metadata */
+		}
+
+		if (disaligned_data > 0) {
+			/* TODO: Add padding */
+			npages++;
+		}
+	} else {
+		sync_len -= disaligned_data;
+	}
+
+	/* write data to media */
+	synced_pages = flash_write(f, f->w_buffer.sync, ppa_off, npages);
+	if (synced_pages != npages) {
+		LNVM_DEBUG("Error syncing data\n");
+		return -1;
+	}
+
+	synced_bytes = synced_pages * PAGE_SIZE;
+	f->w_buffer.cursync += synced_bytes;
+	f->w_buffer.sync += synced_bytes;
 
 	return 0;
 }
@@ -211,7 +246,7 @@ void nvm_close(int fd, int flags)
 
 /* TODO: Implement a pool of available bloks to support double buffering */
 /*
- * TODO: Flush pages in a different threa as write buffer gets filled up,
+ * TODO: Flush pages in a different thread as write buffer gets filled up,
  * instead of flushing the whole block at a time
  */
 size_t nvm_append(int fd, const void *buf, size_t count)
@@ -241,8 +276,8 @@ size_t nvm_append(int fd, const void *buf, size_t count)
 		memcpy(mem, buf, fits_buf);
 		mem += fits_buf;
 		f->w_buffer.cursize += fits_buf;
-		if (!file_sync(f, FORCE_FLUSH)) {
-			LNVM_DEBUG("Cannot force flush for file %lu\n", f->gid);
+		if (!file_sync(f, FORCE_SYNC)) {
+			LNVM_DEBUG("Cannot force sync for file %lu\n", f->gid);
 			return -ENOSPC;
 		}
 		switch_block(f);
